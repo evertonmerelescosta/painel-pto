@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="pt-br" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Controle - Projeto Testemunha Ocular</title>
+    <!-- Estilização ultra-leve com Pico.css. Nenhuma classe CSS é necessária. -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@1/css/pico.min.css">
+    <!-- Biblioteca do cliente Supabase -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        /* Pequenos ajustes para a nossa UI */
+        body { padding-top: 2rem; }
+        .document-card footer { display: flex; gap: 1rem; margin-top: 1rem; }
+        .document-card h4 { margin-bottom: 0.5rem; }
+        .document-card small { color: var(--secondary); }
+    </style>
+</head>
+<body>
+    <main class="container">
+        <header>
+            <h1>Painel de Classificação de Documentos</h1>
+            <p>Projeto Testemunha Ocular</p>
+        </header>
+
+        <div id="loading-indicator">
+            <p aria-busy="true">Buscando documentos pendentes no repositório...</p>
+        </div>
+
+        <div id="documentos-container">
+            <!-- Os documentos coletados serão inseridos aqui pelo JavaScript -->
+        </div>
+    </main>
+
+    <script>
+        // --- CONFIGURAÇÃO ---
+        const SUPABASE_URL = 'https://ywvssacobpwxxugyroaz.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3dnNzYWNvYnB3eHh1Z3lyb2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NzA2NzQsImV4cCI6MjA3ODA0NjY3NH0.w-2_YwBvRexBRGCdGJgja8yQPXTYV2mcogGmAXQ9gJs';
+        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+        // --- REFERÊNCIAS DO DOM ---
+        const container = document.getElementById('documentos-container');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // --- FUNÇÕES PRINCIPAIS ---
+
+        /**
+         * Busca documentos com status 'Pendente' e os renderiza na tela.
+         */
+        async function fetchAndRenderDocuments() {
+            loadingIndicator.style.display = 'block';
+            container.innerHTML = '';
+
+            const { data: documentos, error } = await supabase
+                .from('documentos')
+                .select('*')
+                .eq('status', 'Pendente')
+                .order('criado_em', { ascending: false });
+
+            loadingIndicator.style.display = 'none';
+
+            if (error) {
+                console.error('Erro ao buscar documentos:', error);
+                container.innerHTML = `<article><p><strong>Erro:</strong> Não foi possível carregar os documentos. Verifique o console do navegador.</p></article>`;
+                return;
+            }
+
+            if (documentos.length === 0) {
+                container.innerHTML = `<article><p>Nenhum documento pendente para análise. O Coletor está trabalhando.</p></article>`;
+                return;
+            }
+
+            documentos.forEach(doc => {
+                const docElement = document.createElement('article');
+                docElement.classList.add('document-card');
+                docElement.setAttribute('data-doc-id', doc.id);
+
+                docElement.innerHTML = `
+                    <header>
+                        <h4>${doc.titulo}</h4>
+                        <small>Ano: ${doc.ano_publicacao || 'N/A'} | Coordenadas: ${doc.contem_coordenadas ? 'Sim' : 'Não'}</small>
+                    </header>
+                    <p>${doc.resumo}</p>
+                    <footer>
+                        <a href="${doc.url_fonte}" target="_blank" role="button" class="secondary outline">Abrir Fonte</a>
+                        <button class="update-status-btn" data-new-status="Relevante">✓ Relevante</button>
+                        <button class="update-status-btn contrast" data-new-status="Descartado">X Descartado</button>
+                    </footer>
+                `;
+                container.appendChild(docElement);
+            });
+        }
+
+        /**
+         * Atualiza o status de um documento no banco de dados.
+         * @param {string} id - O ID do documento a ser atualizado.
+         * @param {string} newStatus - O novo status ('Relevante' ou 'Descartado').
+         */
+        async function updateDocumentStatus(id, newStatus) {
+            const { error } = await supabase
+                .from('documentos')
+                .update({ status: newStatus })
+                .eq('id', id);
+
+            if (error) {
+                console.error(`Erro ao atualizar para ${newStatus}:`, error);
+                alert(`Falha ao atualizar o status. Verifique o console.`);
+                return false;
+            }
+            return true;
+        }
+
+        // --- EVENT LISTENER (DELEGAÇÃO DE EVENTOS) ---
+        container.addEventListener('click', async (event) => {
+            if (event.target.classList.contains('update-status-btn')) {
+                const button = event.target;
+                const card = button.closest('.document-card');
+                const docId = card.getAttribute('data-doc-id');
+                const newStatus = button.getAttribute('data-new-status');
+
+                // Desabilita os botões para prevenir múltiplos cliques
+                button.setAttribute('aria-busy', 'true');
+                
+                const success = await updateDocumentStatus(docId, newStatus);
+                
+                if (success) {
+                    // Remove o card da tela para feedback imediato
+                    card.remove();
+                } else {
+                    // Reabilita o botão em caso de falha
+                    button.removeAttribute('aria-busy');
+                }
+            }
+        });
+
+        // --- INICIALIZAÇÃO ---
+        fetchAndRenderDocuments();
+    </script>
+</body>
+</html>
