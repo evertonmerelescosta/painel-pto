@@ -36,7 +36,9 @@
         // --- CONFIGURAÇÃO ---
         const SUPABASE_URL = 'https://ywvssacobpwxxugyroaz.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl3dnNzYWNvYnB3eHh1Z3lyb2F6Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjI0NzA2NzQsImV4cCI6MjA3ODA0NjY3NH0.w-2_YwBvRexBRGCdGJgja8yQPXTYV2mcogGmAXQ9gJs';
-        const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        
+        // CORREÇÃO: Usamos a biblioteca global 'supabase' para criar nosso cliente com um nome único 'supabaseClient'
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
         // --- REFERÊNCIAS DO DOM ---
         const container = document.getElementById('documentos-container');
@@ -51,7 +53,8 @@
             loadingIndicator.style.display = 'block';
             container.innerHTML = '';
 
-            const { data: documentos, error } = await supabase
+            // CORREÇÃO: Usamos nossa variável 'supabaseClient'
+            const { data: documentos, error } = await supabaseClient
                 .from('documentos')
                 .select('*')
                 .eq('status', 'Pendente')
@@ -97,7 +100,8 @@
          * @param {string} newStatus - O novo status ('Relevante' ou 'Descartado').
          */
         async function updateDocumentStatus(id, newStatus) {
-            const { error } = await supabase
+            // CORREÇÃO: Usamos nossa variável 'supabaseClient'
+            const { error } = await supabaseClient
                 .from('documentos')
                 .update({ status: newStatus })
                 .eq('id', id);
@@ -118,16 +122,13 @@
                 const docId = card.getAttribute('data-doc-id');
                 const newStatus = button.getAttribute('data-new-status');
 
-                // Desabilita os botões para prevenir múltiplos cliques
                 button.setAttribute('aria-busy', 'true');
                 
                 const success = await updateDocumentStatus(docId, newStatus);
                 
                 if (success) {
-                    // Remove o card da tela para feedback imediato
                     card.remove();
                 } else {
-                    // Reabilita o botão em caso de falha
                     button.removeAttribute('aria-busy');
                 }
             }
